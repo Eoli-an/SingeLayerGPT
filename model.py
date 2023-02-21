@@ -10,6 +10,7 @@ https://github.com/huggingface/transformers/blob/main/src/transformers/models/gp
 import math
 import inspect
 from dataclasses import dataclass
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -125,6 +126,7 @@ class GPTConfig:
     dropout: float = 0.0
     bias: bool = True # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     n_simulated_layer: int = 12
+    stoi: dict = None
 
 class GPT(nn.Module):
 
@@ -133,12 +135,16 @@ class GPT(nn.Module):
         assert config.vocab_size is not None
         assert config.block_size is not None
         self.config = config
+        self.prefix_length = 4 #TODO hack for appending prefix
+
+
+        self.config.block_size = config.block_size + self.prefix_length #TODO hack for appending prefix
 
         self.transformer = nn.ModuleDict(dict(
             wte = nn.Embedding(config.vocab_size, config.n_embd),
             wpe = nn.Embedding(config.block_size, config.n_embd),
             drop = nn.Dropout(config.dropout),
-            h = nn.ModuleList([Block(config) for _ in range(1)]), #TODO changed here, if MLP should be different for every layer this has to be changed
+            h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]), #TODO maybe change to one here again
             ln_f = LayerNorm(config.n_embd, bias=config.bias),
         ))
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
@@ -181,18 +187,35 @@ class GPT(nn.Module):
     def forward(self, idx, targets=None):
         device = idx.device
         b, t = idx.size()
-        assert t <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
+        assert t + self.prefix_length <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size - self.prefix_length}"#TODO change magic number
         pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
 
         # forward the GPT model itself
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
         x = self.transformer.drop(tok_emb + pos_emb)
+
         
         #TODO this is my implementation, weird because ModuleList is not subscripable
+        #it adds a layer specific prefix to the input of each layer
         for i in range(self.config.n_simulated_layer):
+            prefix = 'l: ' + str(i)
+            prefix = [self.config.stoi[c] for c in prefix]
+            prefix = np.array(prefix, dtype=np.uint16)
+            prefix = torch.from_numpy((prefix).astype(np.int64)) 
+            prefix_emb = self.transformer.wte(prefix)
+
+            #repeat embedding along batch_axis
+            prefix_emb = prefix_emb.repeat(b, 1, 1)
+
+            #concatonate prefix embedding with token embedding
+            x = torch.cat((prefix_emb, x), dim=1)
+
             for block in self.transformer.h:
                 x = block(x)
+            
+            #remove prefix embedding
+            x = x[:, prefix_emb.shape[1]:, :]
             
         
         x = self.transformer.ln_f(x)
