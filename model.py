@@ -187,7 +187,7 @@ class GPT(nn.Module):
         x = self.transformer.drop(tok_emb + pos_emb)
         
         #TODO this is my implementation
-        for i in range(n_simulated_layer):
+        for i in range(config.n_simulated_layer):
             x = self.transformer.h[0][x]
         
         #for block in self.transformer.h:
