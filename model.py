@@ -124,7 +124,7 @@ class GPTConfig:
     n_embd: int = 768
     dropout: float = 0.0
     bias: bool = True # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    n_simulated_layer: int = 12 TODO supposedly wrong syntax, no idea
+    n_simulated_layer: int = 12
 
 class GPT(nn.Module):
 
