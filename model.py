@@ -135,7 +135,7 @@ class GPT(nn.Module):
         assert config.vocab_size is not None
         assert config.block_size is not None
         self.config = config
-        self.prefix_length = 8 #TODO hack for appending prefix
+        self.prefix_length = 16 #TODO hack for appending prefix
 
 
         self.config.block_size = config.block_size + self.prefix_length #TODO hack for appending prefix
