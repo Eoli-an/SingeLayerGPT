@@ -189,12 +189,12 @@ class GPT(nn.Module):
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
         x = self.transformer.drop(tok_emb + pos_emb)
         
-        #TODO this is my implementation
+        #TODO this is my implementation, weird because ModuleList is not subscripable
         for i in range(self.config.n_simulated_layer):
-            x = self.transformer.h[0][x]
+            for block in self.transformer.h:
+                x = block(x)
+            
         
-        #for block in self.transformer.h:
-        #    x = block(x)
         x = self.transformer.ln_f(x)
 
         if targets is not None:
