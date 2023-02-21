@@ -198,7 +198,27 @@ class GPT(nn.Module):
         
         #TODO this is my implementation, weird because ModuleList is not subscripable
         #it adds a layer specific prefix to the input of each layer
-        for i in range(self.config.n_simulated_layer):
+        with torch.no_grad():
+            for i in range(self.config.n_simulated_layer - 1):
+                prefix =  str(i) * self.prefix_length
+                prefix = [self.config.stoi[c] for c in prefix]
+                prefix = np.array(prefix, dtype=np.uint16)
+                prefix = torch.from_numpy((prefix).astype(np.int64)) 
+                prefix_emb = self.transformer.wte(prefix)
+
+                #repeat embedding along batch_axis
+                prefix_emb = prefix_emb.repeat(b, 1, 1)
+
+                #concatonate prefix embedding with token embedding
+                x = torch.cat((prefix_emb, x), dim=1)
+
+                for block in self.transformer.h:
+                    x = block(x)
+                
+                #remove prefix embedding
+                x = x[:, prefix_emb.shape[1]:, :]
+        
+        for i in range(1):
             prefix =  str(i) * self.prefix_length
             prefix = [self.config.stoi[c] for c in prefix]
             prefix = np.array(prefix, dtype=np.uint16)
