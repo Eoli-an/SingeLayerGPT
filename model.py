@@ -202,7 +202,7 @@ class GPT(nn.Module):
             prefix =  str(i) * self.prefix_length
             prefix = [self.config.stoi[c] for c in prefix]
             prefix = np.array(prefix, dtype=np.uint16)
-            prefix = torch.from_numpy((prefix).astype(np.int64), device=device) 
+            prefix = torch.from_numpy((prefix).astype(np.int64)).to(device) 
             prefix_emb = self.transformer.wte(prefix)
 
             #repeat embedding along batch_axis
