@@ -135,7 +135,7 @@ class GPT(nn.Module):
         assert config.vocab_size is not None
         assert config.block_size is not None
         self.config = config
-        self.prefix_length = 4 #TODO hack for appending prefix
+        self.prefix_length = 8 #TODO hack for appending prefix
 
 
         self.config.block_size = config.block_size + self.prefix_length #TODO hack for appending prefix
@@ -199,7 +199,7 @@ class GPT(nn.Module):
         #TODO this is my implementation, weird because ModuleList is not subscripable
         #it adds a layer specific prefix to the input of each layer
         for i in range(self.config.n_simulated_layer):
-            prefix = 'l: ' + str(i)
+            prefix =  str(i) * self.prefix_length
             prefix = [self.config.stoi[c] for c in prefix]
             prefix = np.array(prefix, dtype=np.uint16)
             prefix = torch.from_numpy((prefix).astype(np.int64)) 
