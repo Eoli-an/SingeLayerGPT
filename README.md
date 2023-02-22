@@ -17,7 +17,18 @@ This introduces some new flags
 - n_backprop: How far back in the simualted_layers backprop should go
 
 
+The results for the small cpu network (described below) on the char Shakespeare are below. Default is a normal 4-layer transformer, singleLayer is a single layer stacked 4 times. Default16 is a normal 16-layer transformer, singleLayer16 is a single layer stacked 16 times.
 
+![Val Loss](assets/valloss.png)
+
+As we can see, more layers stacked do actually help, but don't get the performance of a standard network. 
+
+## TODOs
+
+- More experiments with different kinds of architectures
+- Make it so only the attention part are shared, and not the feed-forward subnetworks
+
+# NanoGPT
 
 ![nanoGPT](assets/nanogpt.jpg)
 
