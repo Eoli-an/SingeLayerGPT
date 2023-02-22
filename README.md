@@ -1,5 +1,23 @@
 
-# nanoGPT
+# SingeLayerGPT
+
+Fork from nanoGPT exploring how a GPT-like model performs with only one (or a few) layers stacked on each other. Kind of like an RNN, but upwards. The idea behind is that the attention mechanism allows for flexible calculation based on the input. Thus, in theory it could be possible for a single layer to learn the calculations for all normal layers in a transformer.
+
+![Idea of the approach](assets/Idea.png )
+
+Furthermore, I had two more ideas for the approach:
+
+1. At every layer, add a prefix to the input which specifies the current level in the stack. This prefix does not get forward propagated and instead is provided at every level
+2. Only to backpropagation for the last few simulated layers. The idea here is that still all layers are trained as the weights are shared and it speeds up trainign.
+
+This introduces some new flags
+
+- n_simulated_layers: How often the single layer (or the n_layer) should be stacked on top of each other
+- prefix_length: How long the prefix should be (how the prefix looks like is currently hard-coded)
+- n_backprop: How far back in the simualted_layers backprop should go
+
+
+
 
 ![nanoGPT](assets/nanogpt.jpg)
 
