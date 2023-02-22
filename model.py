@@ -127,6 +127,8 @@ class GPTConfig:
     bias: bool = True # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     n_simulated_layer: int = 12
     stoi: dict = None
+    prefix_length: int = 0
+    n_backprop: int = 1
 
 class GPT(nn.Module):
 
@@ -135,16 +137,14 @@ class GPT(nn.Module):
         assert config.vocab_size is not None
         assert config.block_size is not None
         self.config = config
-        self.prefix_length = 16 #TODO hack for appending prefix
 
-
-        self.config.block_size = config.block_size + self.prefix_length #TODO hack for appending prefix
+        self.config.block_size = config.block_size + self.config.prefix_length #TODO hack for appending prefix
 
         self.transformer = nn.ModuleDict(dict(
             wte = nn.Embedding(config.vocab_size, config.n_embd),
             wpe = nn.Embedding(config.block_size, config.n_embd),
             drop = nn.Dropout(config.dropout),
-            h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]), #TODO maybe change to one here again
+            h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
             ln_f = LayerNorm(config.n_embd, bias=config.bias),
         ))
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
@@ -187,7 +187,7 @@ class GPT(nn.Module):
     def forward(self, idx, targets=None):
         device = idx.device
         b, t = idx.size()
-        assert t + self.prefix_length <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size - self.prefix_length}"#TODO change magic number
+        assert t + self.config.prefix_length <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size - self.config.prefix_length}"#TODO change magic number
         pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
 
         # forward the GPT model itself
@@ -196,11 +196,16 @@ class GPT(nn.Module):
         x = self.transformer.drop(tok_emb + pos_emb)
 
         
-        #TODO this is my implementation, weird because ModuleList is not subscripable
-        #it adds a layer specific prefix to the input of each layer
+        
+        #This is tweaked from the original Code in two ways:
+        # 1. On every layyer an optional prefix is appended, thus allowing the model to recognize which layer it currently is in and adjusting its output accordingly
+        # 2. Backrpopagation is only performed on the last n_backprop simulated layers, with the idea being that all layers are still being trained, thus speeding up training
         with torch.no_grad():
-            for i in range(self.config.n_simulated_layer - 1):
-                prefix =  str(i) * self.prefix_length
+            for i in range(self.config.n_simulated_layer - self.config.n_backprop):
+
+                #TODO allow for more flexible prefixes, also this is hardcoded for the char-level model
+                #generate the prefix embedding and add it to the input of the layer
+                prefix =  str(i) * self.config.prefix_length
                 prefix = [self.config.stoi[c] for c in prefix]
                 prefix = np.array(prefix, dtype=np.uint16)
                 prefix = torch.from_numpy((prefix).astype(np.int64)).to(device) 
@@ -218,8 +223,10 @@ class GPT(nn.Module):
                 #remove prefix embedding
                 x = x[:, prefix_emb.shape[1]:, :]
         
-        for i in range(1):
-            prefix =  str(i) * self.prefix_length
+        for i in range(self.config.n_backprop):
+
+            #TODO allow for more flexible prefixes, also this is hardcoded for the char-level model
+            prefix =  str(i) * self.config.prefix_length
             prefix = [self.config.stoi[c] for c in prefix]
             prefix = np.array(prefix, dtype=np.uint16)
             prefix = torch.from_numpy((prefix).astype(np.int64)).to(device) 
