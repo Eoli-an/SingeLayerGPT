@@ -3,7 +3,7 @@
 
 Fork from nanoGPT exploring how a GPT-like model performs with only one (or a few) layers stacked on each other. Kind of like an RNN, but upwards. The idea behind is that the attention mechanism allows for flexible calculation based on the input. Thus, in theory it could be possible for a single layer to learn the calculations for all normal layers in a transformer.
 
-![Idea of the approach](assests/idea.jpg)
+![Idea of the approach](assets/Idea.png )
 
 Furthermore, I had two more ideas for the approach:
 
