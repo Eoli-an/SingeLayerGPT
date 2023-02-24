@@ -147,6 +147,7 @@ class GPT(nn.Module):
             h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
             ln_f = LayerNorm(config.n_embd, bias=config.bias),
         ))
+        #TODO use different heads and different layernorms
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
@@ -196,7 +197,7 @@ class GPT(nn.Module):
         x = self.transformer.drop(tok_emb + pos_emb)
 
         
-        
+        outputs = []
         #This is tweaked from the original Code in two ways:
         # 1. On every layyer an optional prefix is appended, thus allowing the model to recognize which layer it currently is in and adjusting its output accordingly
         # 2. Backrpopagation is only performed on the last n_backprop simulated layers, with the idea being that all layers are still being trained, thus speeding up training
@@ -222,6 +223,7 @@ class GPT(nn.Module):
                 
                 #remove prefix embedding
                 x = x[:, prefix_emb.shape[1]:, :]
+                outputs.append(x)
         
         for i in range(self.config.n_backprop):
 
@@ -243,14 +245,20 @@ class GPT(nn.Module):
             
             #remove prefix embedding
             x = x[:, prefix_emb.shape[1]:, :]
+            outputs.append(x)
             
         
-        x = self.transformer.ln_f(x)
+        #x = self.transformer.ln_f(x)
+        outputs = [self.transformer.ln_f(x) for x in outputs]
 
         if targets is not None:
             # if we are given some desired targets also calculate the loss
-            logits = self.lm_head(x)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            #logits = self.lm_head(x)
+            #loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            logits = [self.lm_head(x) for x in outputs]
+            loss = [F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1) for logits in logits]
+            loss = torch.mean(torch.stack(loss))
+
         else:
             # inference-time mini-optimization: only forward the lm_head on the very last position
             logits = self.lm_head(x[:, [-1], :]) # note: using list [-1] to preserve the time dim
