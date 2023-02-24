@@ -196,7 +196,7 @@ class GPT(nn.Module):
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
         x = self.transformer.drop(tok_emb + pos_emb)
 
-        
+        #TODO backprop is not reduntant, maybe change that
         outputs = []
         #This is tweaked from the original Code in two ways:
         # 1. On every layyer an optional prefix is appended, thus allowing the model to recognize which layer it currently is in and adjusting its output accordingly
@@ -224,6 +224,10 @@ class GPT(nn.Module):
                 #remove prefix embedding
                 x = x[:, prefix_emb.shape[1]:, :]
                 outputs.append(x)
+                #hack to break backprop
+                x.detach_()
+                
+
         
         for i in range(self.config.n_backprop):
 
@@ -246,6 +250,7 @@ class GPT(nn.Module):
             #remove prefix embedding
             x = x[:, prefix_emb.shape[1]:, :]
             outputs.append(x)
+            x.detach_()
             
         
         #x = self.transformer.ln_f(x)
