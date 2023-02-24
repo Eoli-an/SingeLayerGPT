@@ -55,7 +55,7 @@ n_backprop = n_simulated_layer #How far back to backpropagate
 prefix_length = 0 #How many tokens to use as prefix in the layers, 0 means no prefix 
 n_head = 12
 n_embd = 768
-dropout = 0.0 # for pretraining 0 is good, for finetuning try 0.1+
+dropout = 0.0 # for pretraining 0 is good, for finetuning try 0.1+ 
 bias = False # do we use bias inside LayerNorm and Linear layers? 
 # adamw optimizer
 learning_rate = 6e-4 # max learning rate
