@@ -225,7 +225,7 @@ class GPT(nn.Module):
                 x = x[:, prefix_emb.shape[1]:, :]
                 outputs.append(x)
                 #hack to break backprop
-                x.detach_()
+                x = x.detach()
                 
 
         
@@ -250,7 +250,7 @@ class GPT(nn.Module):
             #remove prefix embedding
             x = x[:, prefix_emb.shape[1]:, :]
             outputs.append(x)
-            x.detach_()
+            x = x.detach()
             
         
         #x = self.transformer.ln_f(x)
