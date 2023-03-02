@@ -1,3 +1,6 @@
+# More feedback
+
+Each layer gets the labels as a loss. Idea: If each layer makes the tokens a bit better for predicting the next token, this should maybe work. Does not seem to be the case though
 
 # SingeLayerGPT
 
