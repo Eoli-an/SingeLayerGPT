@@ -174,7 +174,7 @@ class GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, idx, targets=None):
+    def forward(self, idx, targets=None, confidence_threshold=0.9):
         device = idx.device
         b, t = idx.size()
         assert t <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
@@ -184,20 +184,37 @@ class GPT(nn.Module):
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
         x = self.transformer.drop(tok_emb + pos_emb)
+        logits_list = []
+
         for block in self.transformer.h:
             x = block(x)
-        x = self.transformer.ln_f(x)
+            logits = self.lm_head(x)
+            logits_list.append(logits)
+
+        # Find the index of the layer where confidence threshold is met
+        layer_idx = torch.zeros((b, t), dtype=torch.long, device=device)
+        for i, logits in enumerate(logits_list):
+            probs = F.softmax(logits, dim=-1)
+            mask = (probs.max(dim=-1).values >= confidence_threshold) & (layer_idx == 0)
+            layer_idx[mask] = i + 1
+
+        layer_idx[layer_idx == 0] = len(self.transformer.h)
+
+        # Choose logits from the corresponding layer
+        final_logits = torch.zeros((b, t, self.config.vocab_size), device=device)
+        for batch_idx in range(b):
+            for time_idx in range(t):
+                final_logits[batch_idx, time_idx] = logits_list[layer_idx[batch_idx, time_idx] - 1][batch_idx, time_idx]
 
         if targets is not None:
             # if we are given some desired targets also calculate the loss
-            logits = self.lm_head(x)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            loss = F.cross_entropy(final_logits.view(-1, final_logits.size(-1)), targets.view(-1), ignore_index=-1)
         else:
             # inference-time mini-optimization: only forward the lm_head on the very last position
-            logits = self.lm_head(x[:, [-1], :]) # note: using list [-1] to preserve the time dim
+            logits = final_logits[:, [-1], :] # note: using list [-1] to preserve the time dim
             loss = None
 
-        return logits, loss
+        return final_logits, loss
 
     def crop_block_size(self, block_size):
         # model surgery to decrease the block size if necessary
