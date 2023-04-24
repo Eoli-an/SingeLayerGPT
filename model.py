@@ -174,7 +174,7 @@ class GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, idx, targets=None, confidence_threshold=0.9):
+    def forward(self, idx, targets=None, confidence_threshold=0.5):
         device = idx.device
         b, t = idx.size()
         assert t <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
@@ -195,9 +195,12 @@ class GPT(nn.Module):
         layer_idx = torch.zeros((b, t), dtype=torch.long, device=device)
         for i, logits in enumerate(logits_list):
             probs = F.softmax(logits, dim=-1)
+            # for all tokens, where the confidence is higher than the threshold and which has not been set before, the mask is True
             mask = (probs.max(dim=-1).values >= confidence_threshold) & (layer_idx == 0)
+            #set the layer for the mask
             layer_idx[mask] = i + 1
-
+        
+        #Every token that does not get set, gets max length
         layer_idx[layer_idx == 0] = len(self.transformer.h)
 
         # Choose logits from the corresponding layer
