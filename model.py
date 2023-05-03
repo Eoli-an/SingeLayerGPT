@@ -111,7 +111,7 @@ class Block(nn.Module):
     def forward(self, x):
         x = x + self.attn(self.ln_1(x))
         t = self.mlp2(self.ln_2(x)) 
-        x = self.mlp1(self.ln_2(x))  # Calculate c
+        x = x + self.mlp1(self.ln_2(x))  # Calculate c
          # Calculate t
         return x, t
     
