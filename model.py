@@ -105,12 +105,21 @@ class Block(nn.Module):
         self.ln_1 = LayerNorm(config.n_embd, bias=config.bias)
         self.attn = CausalSelfAttention(config)
         self.ln_2 = LayerNorm(config.n_embd, bias=config.bias)
-        self.mlp = MLP(config)
+        self.mlp1 = MLP(config)
+        self.mlp2 = MLP(config)
 
     def forward(self, x):
-        x = x + self.attn(self.ln_1(x))
-        x = x + self.mlp(self.ln_2(x))
-        return x
+        #handles first case, where there is no tuple
+        try:
+            c, t = x
+        except:
+            c = x
+            t = None
+
+        a = c + self.attn(self.ln_1(c))# Only calculate with c part
+        c = c + self.mlp1(self.ln_2(a))# Calculate new c
+        t = t + self.mlp2(self.ln_2(a))# Calculate new t
+        return (c, x)
 
 @dataclass
 class GPTConfig:
@@ -188,9 +197,11 @@ class GPT(nn.Module):
 
         for block in self.transformer.h:
             x = block(x)
-            logits = self.lm_head(x)
+            c, t = x
+            logits = self.lm_head(t)
             logits_list.append(logits)
-
+        c, t = x
+        x = t
         # Find the index of the layer where confidence threshold is met
         layer_idx = torch.zeros((b, t), dtype=torch.long, device=device)
         for i, logits in enumerate(logits_list):
