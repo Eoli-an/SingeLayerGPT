@@ -114,7 +114,7 @@ class Block(nn.Module):
             c, t = x
         except:
             c = x
-            t = None
+            t = x
 
         a = c + self.attn(self.ln_1(c))# Only calculate with c part
         c = c + self.mlp1(self.ln_2(a))# Calculate new c
