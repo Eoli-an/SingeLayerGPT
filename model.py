@@ -109,13 +109,12 @@ class Block(nn.Module):
         self.mlp2 = MLP(config)
 
     def forward(self, x):
-        #handles first case, where there is no tuple
-        try:
-            c, t = x
-        except:
-            c = x
-            t = x
-
+        x = x + self.attn(self.ln_1(x))
+        t = self.mlp2(self.ln_2(x)) 
+        x = self.mlp1(self.ln_2(x))  # Calculate c
+         # Calculate t
+        return x, t
+    
         a = c + self.attn(self.ln_1(c))# Only calculate with c part
         c = c + self.mlp1(self.ln_2(a))# Calculate new c
         t = t + self.mlp2(self.ln_2(a))# Calculate new t
@@ -193,15 +192,16 @@ class GPT(nn.Module):
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
         x = self.transformer.drop(tok_emb + pos_emb)
+        ta = torch.zeros_like(x)
         logits_list = []
 
         for block in self.transformer.h:
-            x = block(x)
-            c, t = x
-            logits = self.lm_head(t)
+            x, new_ta = block(x)
+            ta = ta + new_ta
+            logits = self.lm_head(ta)
             logits_list.append(logits)
-        c, t = x
-        x = t
+
+        x = ta
         # Find the index of the layer where confidence threshold is met
         layer_idx = torch.zeros((b, t), dtype=torch.long, device=device)
         for i, logits in enumerate(logits_list):
